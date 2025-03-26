@@ -4,3 +4,4 @@ const AccountTypeSchema = new mongoose.Schema({
 });
 
 const AccountType = mongoose.model("AccountType", AccountTypeSchema);
+module.exports = AccountType;
