@@ -76,7 +76,7 @@ const deleteAccount = async (req, res) => {
     if (!deletedAccount) {
       return res.status(404).json({ message: "Account not found" });
     }
-
+    // filter out accountId from user account
     return res.status(200).json({ message: "Account deleted successfully" });
   } catch (error) {
     console.error(error);
