@@ -2,9 +2,12 @@ const mongoose = require("mongoose");
 
 const currencySchema = new mongoose.Schema(
   {
-    name: { // INR , USD
+    name: {
+      // INR , USD
       type: String,
       required: true,
+      unique: true,
+      index: true,
     },
   },
   { timestamps: true }

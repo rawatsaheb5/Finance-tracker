@@ -2,7 +2,7 @@
 const bcrypt = require("bcrypt");
 const User = require("../models/user");
 const { generateToken } = require("../helper/jwt");
-const { ACCESS_TOKEN_SECRET, AccessTokenExpiry, REFRESH_TOKEN_SECRET, RefreshTokenExpiry } = require("../constants/constant");
+const { ACCESS_TOKEN_SECRET, AccessTokenExpiry, REFRESH_TOKEN_SECRET, RefreshTokenExpiry, AccessTokenCookieExpiry, RefreshTokenCookieExpiry } = require("../constants/constant");
 
 
 exports.signUp = async (req, res) => {
@@ -71,14 +71,15 @@ exports.signIn = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "None", // Fix: Allow cross-origin requests
-      maxAge: AccessTokenExpiry,
+      maxAge: AccessTokenCookieExpiry
     });
 
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "None",
-      maxAge: RefreshTokenExpiry,
+      maxAge:RefreshTokenCookieExpiry
+     
     });
 
     res.status(200).json({
@@ -86,6 +87,7 @@ exports.signIn = async (req, res) => {
       user: { id: user._id, name: user.name, email: user.email },
     });
   } catch (error) {
+    console.log(error)
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });

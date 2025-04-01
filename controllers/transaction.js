@@ -220,5 +220,50 @@ const deleteTransaction = async (req, res) => {
 };
 
 
-module.exports = { addTransaction, editTransaction, deleteTransaction };
+
+const getAllTransactionsOfAccountPaginated = async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const { page = 1, limit = 10 } = req.query; // Default page = 1, limit = 10
+
+    // Ensure page and limit are positive integers
+    const pageNumber = Math.max(1, parseInt(page));
+    const pageSize = Math.max(1, parseInt(limit));
+
+    // Fetch transactions with pagination
+    const transactions = await Transaction.find({ account: accountId })
+      .sort({ createdAt: -1 }) // Sort by latest first
+      .skip((pageNumber - 1) * pageSize) // Skip previous pages
+      .limit(pageSize); // Limit results per page
+
+    // Get total count of transactions for the account
+    const totalTransactions = await Transaction.countDocuments({
+      account: accountId,
+    });
+
+    res.status(200).json({
+      message: "Transactions fetched successfully",
+      transactions,
+      pagination: {
+        totalRecords: totalTransactions,
+        currentPage: pageNumber,
+        totalPages: Math.ceil(totalTransactions / pageSize),
+        pageSize,
+      },
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error fetching transactions", error: error.message });
+  }
+};
+
+
+
+module.exports = {
+  addTransaction,
+  editTransaction,
+  deleteTransaction,
+  getAllTransactionsOfAccountPaginated,
+};
 

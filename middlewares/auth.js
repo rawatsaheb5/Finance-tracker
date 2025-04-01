@@ -5,7 +5,7 @@ const { AccessTokenExpiry } = require("../constants/constant");
 
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
-const ACCESS_TOKEN_EXPIRY = "15m"; // 15 minutes
+const ACCESS_TOKEN_EXPIRY = process.env.ACCESS_TOKEN_EXPIRY;
 
 const authenticateUser = async (req, res, next) => {
   try {
@@ -62,7 +62,7 @@ const authenticateUser = async (req, res, next) => {
               httpOnly: true,
               secure: process.env.NODE_ENV === "production",
               sameSite: "strict",
-              maxAge: AccessTokenExpiry, // 15 minutes
+              maxAge: ACCESS_TOKEN_EXPIRY, // 15 minutes
             });
 
             req.user = refreshDecoded;

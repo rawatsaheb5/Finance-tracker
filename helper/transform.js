@@ -1,4 +1,4 @@
-export function convertToUTC(dateInput) {
+const convertToUTC = (dateInput) =>{
   const date = new Date(dateInput);
 
   if (isNaN(date.getTime())) {
@@ -6,4 +6,8 @@ export function convertToUTC(dateInput) {
   }
 
   return date.toISOString(); // Returns UTC time in ISO 8601 format
+}
+
+module.exports = {
+    convertToUTC
 }

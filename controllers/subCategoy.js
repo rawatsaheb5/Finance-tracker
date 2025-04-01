@@ -69,3 +69,8 @@ const deleteSubCategory = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+module.exports = {
+  addSubCategory,
+  updateSubCategory,
+  deleteSubCategory
+}

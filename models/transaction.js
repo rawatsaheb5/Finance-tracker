@@ -7,21 +7,17 @@ const TransactionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Account",
       required: true,
+      index:true,
     }, // Reference to Account
-    type: { type: String, enum: ["INCOME", "EXPENSE"], required: true }, // Credit/Debit
+    type: { type: String, enum: ["INCOME", "EXPENSE"], required: true , index:true}, // Credit/Debit
     category: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",
       required: true,
+      index:true
     }, // Reference to Category
     subCategory: { type: mongoose.Schema.Types.ObjectId, ref: "SubCategory" }, // Reference to SubCategory
-    paymentMethod: { type: String, required: true }, // No strict enum for flexibility
-    isRecurring: { type: Boolean, default: false }, // Recurring transaction?
-    recurrencePeriod: {
-      type: String,
-      enum: ["daily", "weekly", "monthly", "yearly"],
-      default: null,
-    }, // Optional
+    paymentMethod: { type: String, required: true , index:true}, // No strict enum for flexibility
     notes: { type: String, maxlength: 500 }, // Additional details
     tags: [{ type: String }], // To filter transactions
     payer: { type: String, required: true }, // Person who paid
