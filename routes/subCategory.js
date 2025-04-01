@@ -5,7 +5,7 @@ const { addSubCategory, updateSubCategory, deleteSubCategory } = require("../con
 const router = express.Router();
 
 router.post("/create", addSubCategory);
-router.put("/edit", updateSubCategory );
-router.delete("/delete", deleteSubCategory);
+router.put("/edit/:id", updateSubCategory );
+router.delete("/delete/:id", deleteSubCategory);
 
 module.exports = router;

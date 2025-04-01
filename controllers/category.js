@@ -3,17 +3,24 @@ const SubCategory = require("../models/subCategory");
 
 const addCategory = async (req, res) => {
   try {
-    const { name, icon } = req.body;
-    
+    let { name, icon } = req.body;
+    name = name.trim();
+    icon = icon.trim();
+    if (!name || !icon) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
     // Check if category already exists
     const existingCategory = await Category.findOne({ name });
     if (existingCategory) {
       return res.status(400).json({ message: "Category already exists" });
     }
 
-    const newCategory = new Category({ name, icon, subCategories:[] });
+    const newCategory = new Category({ name, icon, subCategories: [] });
     await newCategory.save();
-    res.status(201).json({ message: "Category created successfully", category: newCategory });
+    res.status(201).json({
+      message: "Category created successfully",
+      category: newCategory,
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
@@ -23,15 +30,19 @@ const addCategory = async (req, res) => {
 const updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, icon, subCategories } = req.body;
+    let { name, icon, subCategories } = req.body;
+    name = name.trim();
+    icon = icon.trim();
 
+    if (!Array.isArray(subCategories)) {
+      return res.status(400).json({ message: "Subcategory should be array" });
+    }
     // Check if category name is unique
     const existingCategory = await Category.findOne({ name });
     if (existingCategory && existingCategory.id !== id) {
       return res.status(400).json({ message: "Category name already exists" });
     }
-
-
+    
     const validSubCategories = await Promise.all(
       subCategories.map(async (subCategoryId) => {
         const subCategory = await SubCategory.findById(subCategoryId);
@@ -50,13 +61,10 @@ const updateCategory = async (req, res) => {
     if (!updatedCategory) {
       return res.status(404).json({ message: "Category not found" });
     }
-    res
-      .status(200)
-      .json({
-        message: "Category updated successfully",
-        category: updatedCategory,
-      });
-
+    res.status(200).json({
+      message: "Category updated successfully",
+      category: updatedCategory,
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
@@ -77,7 +85,6 @@ const deleteCategory = async (req, res) => {
   }
 };
 
-
 const getAllCategories = async (req, res) => {
   try {
     const categories = await Category.find().populate("subCategories");
@@ -88,4 +95,9 @@ const getAllCategories = async (req, res) => {
   }
 };
 
-module.exports = { addCategory, updateCategory, deleteCategory, getAllCategories };
+module.exports = {
+  addCategory,
+  updateCategory,
+  deleteCategory,
+  getAllCategories,
+};

@@ -5,8 +5,8 @@ const { addCategory, updateCategory, deleteCategory, getAllCategories } = requir
 const router = express.Router();
 
 router.post("/create", addCategory);
-router.put("/edit", updateCategory);
-router.delete("/delete", deleteCategory);
+router.put("/edit/:id", updateCategory);
+router.delete("/delete/:id", deleteCategory);
 router.get("/all", getAllCategories);
 
 module.exports = router;

@@ -2,8 +2,12 @@ const SubCategory = require("../models/subCategory");
 
 const addSubCategory = async (req, res) => {
   try {
-    const { name, icon } = req.body;
-
+    let { name, icon } = req.body;
+    name = name.trim();
+    icon = icon.trim();
+    if (!name || !icon) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
     const existingSubCategory = await SubCategory.findOne({ name });
     if (existingSubCategory) {
       return res.status(400).json({ message: "Subcategory already exists" });
@@ -14,7 +18,7 @@ const addSubCategory = async (req, res) => {
     res
       .status(201)
       .json({
-        message: "Subcategory created successfully",
+        message: "New subcategory created successfully",
         subCategory: newSubCategory,
       });
   } catch (error) {
