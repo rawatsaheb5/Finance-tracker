@@ -3,10 +3,10 @@ const { addAccount, updateAccount, deleteAccount, getAccountById, getUserAccount
 const authenticateUser = require("../middlewares/auth");
 
 const router = express.Router();
-
+router.get("/all", authenticateUser, getUserAccounts);
 router.post("/create", authenticateUser, addAccount);
-router.put("/edit",authenticateUser, updateAccount);
-router.delete("/delete",authenticateUser, deleteAccount);
+router.put("/edit/:accountId",authenticateUser, updateAccount);
+router.delete("/delete/:accountId",authenticateUser, deleteAccount);
 router.get("/:accountId", authenticateUser, getAccountById);
-router.get("/all",authenticateUser, getUserAccounts)
+
 module.exports = router;

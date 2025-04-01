@@ -8,7 +8,7 @@ const AccountSchema = new mongoose.Schema(
       required: true,
     },
     balance: { type: Number, required: true, min: 0 }, //balance in the account
-    currency: {
+    currencyId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Currency",
       required:true,
