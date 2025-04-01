@@ -2,7 +2,13 @@ const AccountType = require("../models/accountType");
 
 const addAccountType = async (req, res) => {
   try {
-    const { name } = req.body;
+    let { name } = req.body;
+    name = name.trim();
+    if (!name) {
+      return res
+        .status(400)
+        .json({ message: "Account type should not be empty" });
+    }
 
     // Check if the account type already exists
     const existingType = await AccountType.findOne({ name });
@@ -12,12 +18,10 @@ const addAccountType = async (req, res) => {
 
     const newType = new AccountType({ name });
     await newType.save();
-    res
-      .status(201)
-      .json({
-        message: "Account type created successfully",
-        accountType: newType,
-      });
+    res.status(201).json({
+      message: "Account type created successfully",
+      accountType: newType,
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
@@ -27,11 +31,17 @@ const addAccountType = async (req, res) => {
 const updateAccountType = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name } = req.body;
+    let { name } = req.body;
+    name = name.trim();
+    if (!name) {
+      return res
+        .status(400)
+        .json({ message: "Account type should not be empty" });
+    }
 
     // Check if the account type name is already taken
     const existingType = await AccountType.findOne({ name });
-    if (existingType) {
+    if (existingType && existingType._id !== id) {
       return res.status(400).json({ message: "Account type already exists" });
     }
 
@@ -43,12 +53,10 @@ const updateAccountType = async (req, res) => {
     if (!updatedType) {
       return res.status(404).json({ message: "Account type not found" });
     }
-    res
-      .status(200)
-      .json({
-        message: "Account type updated successfully",
-        accountType: updatedType,
-      });
+    res.status(200).json({
+      message: "Account type updated successfully",
+      accountType: updatedType,
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
