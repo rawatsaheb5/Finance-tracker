@@ -5,7 +5,7 @@ const authenticateUser = require("../middlewares/auth");
 const router = express.Router();
 
 router.post("/create", authenticateUser, addTransaction);
-router.put("/edit",authenticateUser, editTransaction);
-router.delete("/delete",authenticateUser, deleteTransaction);
-router.get("/get-all", authenticateUser,getAllTransactionsOfAccountPaginated)
+router.put("/edit/:transactionId",authenticateUser, editTransaction);
+router.delete("/delete/:transactionId",authenticateUser, deleteTransaction);
+router.get("/all/:accountId", authenticateUser,getAllTransactionsOfAccountPaginated)
 module.exports = router;

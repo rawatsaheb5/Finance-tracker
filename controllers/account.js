@@ -1,4 +1,4 @@
-const { default: mongoose } = require("mongoose");
+const mongoose = require("mongoose");
 const Account = require("../models/account");
 const AccountType = require("../models/accountType");
 const Currency = require("../models/currency");

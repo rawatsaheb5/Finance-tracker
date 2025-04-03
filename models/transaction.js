@@ -2,13 +2,12 @@ const mongoose = require("mongoose");
 const TransactionSchema = new mongoose.Schema(
   {
     amount: { type: Number, required: true, min: 0 },
-    currency: { type: String, required: true }, // Store as a string for flexibility
     account: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Account",
       required: true,
       index: true,
-    }, // Reference to Account
+    }, 
     type: {
       type: String,
       enum: ["INCOME", "EXPENSE"],
@@ -24,8 +23,9 @@ const TransactionSchema = new mongoose.Schema(
     subCategory: { type: mongoose.Schema.Types.ObjectId, ref: "SubCategory" }, // Reference to SubCategory
     paymentMethod: {
       type: mongoose.Schema.Types.ObjectId,
-      ref:"PaymentMethod",
-      required: true, index: true
+      ref: "PaymentMethod",
+      required: true,
+      index: true,
     }, // No strict enum for flexibility
     notes: { type: String, maxlength: 500 }, // Additional details
     tags: [{ type: String }], // To filter transactions
