@@ -95,9 +95,105 @@ const getAllCategories = async (req, res) => {
   }
 };
 
+const getCategoryWiseSummary = async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const { range } = req.query;
+
+    const now = new Date();
+    let startDate;
+
+    switch (range) {
+      case "weekly":
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case "monthly":
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case "yearly":
+        startDate = new Date(now.getFullYear(), 0, 1);
+        break;
+      default:
+        startDate = new Date("1970-01-01"); // if no range, include all data
+    }
+
+    const summary = await Transaction.aggregate([
+      {
+        $match: {
+          account: new mongoose.Types.ObjectId(accountId),
+          date: { $gte: startDate, $lte: now },
+        },
+      },
+      {
+        $group: {
+          _id: { category: "$category", type: "$type" },
+          totalAmount: { $sum: "$amount" },
+        },
+      },
+      {
+        $lookup: {
+          from: "categories",
+          localField: "_id.category",
+          foreignField: "_id",
+          as: "categoryDetails",
+        },
+      },
+      {
+        $unwind: "$categoryDetails",
+      },
+      {
+        $project: {
+          type: "$_id.type",
+          categoryId: "$_id.category",
+          categoryName: "$categoryDetails.name",
+          icon: "$categoryDetails.icon",
+          totalAmount: 1,
+          _id: 0,
+        },
+      },
+      {
+        $group: {
+          _id: "$categoryName",
+          icon: { $first: "$icon" },
+          income: {
+            $sum: {
+              $cond: [{ $eq: ["$type", "INCOME"] }, "$totalAmount", 0],
+            },
+          },
+          expense: {
+            $sum: {
+              $cond: [{ $eq: ["$type", "EXPENSE"] }, "$totalAmount", 0],
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          category: "$_id",
+          icon: 1,
+          income: 1,
+          expense: 1,
+          _id: 0,
+        },
+      },
+    ]);
+
+    res.status(200).json({
+      message: `Category-wise summary for ${range || "all time"}`,
+      summary,
+    });
+  } catch (error) {
+    console.error("Error in getCategoryWiseSummary:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+
 module.exports = {
   addCategory,
   updateCategory,
   deleteCategory,
   getAllCategories,
+  getCategoryWiseSummary
 };
