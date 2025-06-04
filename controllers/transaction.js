@@ -318,13 +318,89 @@ const getAccountSummary = async (req, res) => {
   }
 };
 
+const getBalanceTrend = async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const { range } = req.query;
 
+    if (!["daily", "weekly", "monthly", "yearly"].includes(range)) {
+      return res.status(400).json({ message: "Invalid range" });
+    }
+
+    let dateFormat;
+    switch (range) {
+      case "daily":
+        dateFormat = "%Y-%m-%d";
+        break;
+      case "weekly":
+        dateFormat = "%Y-%U"; // %U = week number
+        break;
+      case "monthly":
+        dateFormat = "%Y-%m";
+        break;
+      case "yearly":
+        dateFormat = "%Y";
+        break;
+    }
+
+    const trend = await Transaction.aggregate([
+      {
+        $match: {
+          account: new mongoose.Types.ObjectId(accountId),
+          date: { $lte: new Date() },
+        },
+      },
+      {
+        $project: {
+          amount: {
+            $cond: [
+              { $eq: ["$type", "INCOME"] },
+              "$amount",
+              { $multiply: ["$amount", -1] },
+            ],
+          },
+          dateGroup: {
+            $dateToString: { format: dateFormat, date: "$date" },
+          },
+        },
+      },
+      {
+        $group: {
+          _id: "$dateGroup",
+          netChange: { $sum: "$amount" },
+        },
+      },
+      {
+        $sort: { _id: 1 },
+      },
+    ]);
+
+    // Convert to cumulative balance trend
+    let cumulative = 0;
+    const balanceTrend = trend.map((item) => {
+      cumulative += item.netChange;
+      return {
+        period: item._id,
+        balance: cumulative,
+      };
+    });
+
+    res.status(200).json({
+      message: `Balance trend for ${range}`,
+      trend: balanceTrend,
+    });
+  } catch (error) {
+    console.error("Error in getBalanceTrend:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
 
 module.exports = {
   addTransaction,
   editTransaction,
   deleteTransaction,
   getAllTransactionsOfAccountPaginated,
-  getAccountSummary
+  getAccountSummary,
+  getBalanceTrend
 };
 
