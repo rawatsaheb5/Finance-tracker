@@ -395,12 +395,145 @@ const getBalanceTrend = async (req, res) => {
   }
 };
 
+const getFilteredTransactionsPaginated = async (req, res) => {
+  try {
+    const {
+      accountId,
+      type,
+      category,
+      subCategory,
+      paymentMethod,
+      tags,
+      payer,
+      payee,
+      startDate,
+      endDate,
+      search,
+      page = 1,
+      limit = 10,
+    } = req.query;
+
+    const matchStage = {};
+
+    if (accountId) {
+      matchStage.account = new mongoose.Types.ObjectId(accountId);
+    }
+
+    if (type) {
+      matchStage.type = type;
+    }
+
+    if (category) {
+      matchStage.category = new mongoose.Types.ObjectId(category);
+    }
+
+    if (subCategory) {
+      matchStage.subCategory = new mongoose.Types.ObjectId(subCategory);
+    }
+
+    if (paymentMethod) {
+      matchStage.paymentMethod = new mongoose.Types.ObjectId(paymentMethod);
+    }
+
+    if (payer) {
+      matchStage.payer = { $regex: payer, $options: "i" };
+    }
+
+    if (payee) {
+      matchStage.payee = { $regex: payee, $options: "i" };
+    }
+
+    if (tags) {
+      const tagArray = Array.isArray(tags) ? tags : [tags];
+      matchStage.tags = { $all: tagArray };
+    }
+
+    if (startDate || endDate) {
+      matchStage.date = {};
+      if (startDate) matchStage.date.$gte = new Date(startDate);
+      if (endDate) matchStage.date.$lte = new Date(endDate);
+    }
+
+    if (search) {
+      matchStage.notes = { $regex: search, $options: "i" };
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const aggregationPipeline = [
+      { $match: matchStage },
+
+      // Join lookups
+      {
+        $lookup: {
+          from: "categories",
+          localField: "category",
+          foreignField: "_id",
+          as: "category",
+        },
+      },
+      { $unwind: { path: "$category", preserveNullAndEmptyArrays: true } },
+
+      {
+        $lookup: {
+          from: "subcategories",
+          localField: "subCategory",
+          foreignField: "_id",
+          as: "subCategory",
+        },
+      },
+      { $unwind: { path: "$subCategory", preserveNullAndEmptyArrays: true } },
+
+      {
+        $lookup: {
+          from: "paymentmethods",
+          localField: "paymentMethod",
+          foreignField: "_id",
+          as: "paymentMethod",
+        },
+      },
+      { $unwind: { path: "$paymentMethod", preserveNullAndEmptyArrays: true } },
+
+      // Sort by latest first
+      { $sort: { date: -1 } },
+
+      // Facet to split data + count
+      {
+        $facet: {
+          data: [{ $skip: skip }, { $limit: parseInt(limit) }],
+          totalCount: [{ $count: "count" }],
+        },
+      },
+    ];
+
+    const result = await Transaction.aggregate(aggregationPipeline);
+
+    const transactions = result[0]?.data || [];
+    const total = result[0]?.totalCount[0]?.count || 0;
+    const totalPages = Math.ceil(total / limit);
+
+    res.status(200).json({
+      message: "Paginated transactions fetched successfully",
+      currentPage: parseInt(page),
+      totalPages,
+      total,
+      count: transactions.length,
+      transactions,
+    });
+  } catch (error) {
+    console.error("Error fetching paginated transactions:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+
 module.exports = {
   addTransaction,
   editTransaction,
   deleteTransaction,
   getAllTransactionsOfAccountPaginated,
   getAccountSummary,
-  getBalanceTrend
+  getBalanceTrend,
+  getFilteredTransactionsPaginated
 };
 
