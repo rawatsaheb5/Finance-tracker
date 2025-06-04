@@ -9,7 +9,12 @@ const currencySchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+    symbol: {
+      type: String,
+      required: true,
+    },
   },
+
   { timestamps: true }
 );
 

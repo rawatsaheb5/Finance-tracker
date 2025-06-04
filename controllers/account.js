@@ -140,32 +140,69 @@ const getAccountById = async (req, res) => {
 
 const getUserAccounts = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = new mongoose.Types.ObjectId(req.user.id); // assuming auth middleware sets req.user
 
-    const userAccounts = await User.aggregate([
-      { $match: { _id: new mongoose.Types.ObjectId(userId) } }, // Match user by userId
+    const result = await User.aggregate([
+      { $match: { _id: userId } },
       {
         $lookup: {
-          from: "accounts", // Collection name of accounts
-          localField: "accounts", // Array of account IDs in user model
-          foreignField: "_id", // Matching _id in accounts collection
-          as: "accountDetails", // Output array with account details
+          from: "accounts",
+          localField: "accounts",
+          foreignField: "_id",
+          as: "accountDetails",
+        },
+      },
+      { $unwind: "$accountDetails" },
+      {
+        $lookup: {
+          from: "currencies",
+          localField: "accountDetails.currencyId",
+          foreignField: "_id",
+          as: "currencyDetails",
+        },
+      },
+      { $unwind: "$currencyDetails" },
+      {
+        $project: {
+          _id: 0,
+          account: {
+            _id: "$accountDetails._id",
+            name: "$accountDetails.name",
+            balance: "$accountDetails.balance",
+            currency: {
+              _id: "$currencyDetails._id",
+              name: "$currencyDetails.name",
+              symbol: "$currencyDetails.symbol",
+            },
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          accounts: { $push: "$account" },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          accounts: 1,
         },
       },
     ]);
 
-    if (!userAccounts.length) {
-      return res
-        .status(404)
-        .json({ message: "User not found or no accounts associated" });
-    }
-
-    return res.status(200).json({ accounts: userAccounts[0].accountDetails });
+    res.status(200).json({
+      message: "Accounts fetched successfully",
+      accounts: result[0]?.accounts || [],
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
+    console.error("Aggregation error:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
+
+
+
 
 module.exports = {
   addAccount,

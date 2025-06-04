@@ -1,21 +1,26 @@
-
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs"); 
 const User = require("../models/user");
 const { generateToken } = require("../helper/jwt");
-const { ACCESS_TOKEN_SECRET, AccessTokenExpiry, REFRESH_TOKEN_SECRET, RefreshTokenExpiry, AccessTokenCookieExpiry, RefreshTokenCookieExpiry } = require("../constants/constant");
-
+const {
+  ACCESS_TOKEN_SECRET,
+  AccessTokenExpiry,
+  REFRESH_TOKEN_SECRET,
+  RefreshTokenExpiry,
+  AccessTokenCookieExpiry,
+  RefreshTokenCookieExpiry,
+} = require("../constants/constant");
 
 exports.signUp = async (req, res) => {
   try {
     const { name, email, password } = req.body;
-   
+
     // Check if user already exists
     let user = await User.findOne({ email });
     if (user) {
       return res.status(400).json({ message: "User already exists!" });
     }
 
-    // Hash the password
+    // Hash the password using bcryptjs
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -44,7 +49,7 @@ exports.signIn = async (req, res) => {
       return res.status(400).json({ message: "Invalid email or password" });
     }
 
-    // Compare the provided password with the stored hashed password
+    // Compare password with hashed password using bcryptjs
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ message: "Invalid email or password" });
@@ -62,32 +67,23 @@ exports.signIn = async (req, res) => {
       RefreshTokenExpiry
     );
 
-    // Store refresh token in DB and save user
+    // Store refresh token in DB
     user.refreshToken = refreshToken;
-    await user.save(); // Fix: Save before setting cookies
-
-    // Set cookies
-    res.cookie("accessToken", accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "None", // Fix: Allow cross-origin requests
-      maxAge: AccessTokenCookieExpiry
-    });
+    await user.save();
 
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "None",
-      maxAge:RefreshTokenCookieExpiry
-     
+      maxAge: RefreshTokenCookieExpiry,
     });
 
     res.status(200).json({
       message: "Login successful",
-      user: { id: user._id, name: user.name, email: user.email },
+      user: { id: user._id, name: user.name, email: user.email, accessToken },
     });
   } catch (error) {
-    console.log(error)
+    console.log(error);
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
@@ -96,12 +92,7 @@ exports.signIn = async (req, res) => {
 
 exports.logout = (req, res) => {
   try {
-    // Clear the cookies storing tokens
-    res.clearCookie("accessToken", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "None",
-    });
+
     res.clearCookie("refreshToken", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

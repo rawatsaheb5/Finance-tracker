@@ -6,11 +6,11 @@ const { AccessTokenExpiry, AccessTokenCookieExpiry, ACCESS_TOKEN_SECRET, REFRESH
 
 const authenticateUser = async (req, res, next) => {
   try {
-    const accessToken = req.cookies?.accessToken;
+    const accessToken = req.headers?.authorization?.split(" ")[1];
     const refreshToken = req.cookies?.refreshToken;
 
     if (!refreshToken) {
-      return res.status(401).json({ message: "Unauthorized: No access token" });
+      return res.status(401).json({ message: "Unauthorized: Invalid cookies" });
     }
 
     // Verify the access token
@@ -54,13 +54,6 @@ const authenticateUser = async (req, res, next) => {
             { expiresIn: AccessTokenExpiry }
           ); 
 
-          // Set new access token in cookies
-          res.cookie("accessToken", newAccessToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "strict",
-            maxAge: AccessTokenCookieExpiry, // 15 minutes
-          });
 
           req.user = refreshDecoded;
           next();
