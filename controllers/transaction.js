@@ -258,6 +258,66 @@ const getAllTransactionsOfAccountPaginated = async (req, res) => {
   }
 };
 
+const getAccountSummary = async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const { range } = req.query; // "weekly", "monthly", "yearly"
+
+    if (!["weekly", "monthly", "yearly"].includes(range)) {
+      return res.status(400).json({ message: "Invalid range type" });
+    }
+
+    const now = new Date();
+    let startDate;
+
+    // Calculate start date based on range
+    switch (range) {
+      case "weekly":
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case "monthly":
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case "yearly":
+        startDate = new Date(now.getFullYear(), 0, 1);
+        break;
+    }
+
+    const result = await Transaction.aggregate([
+      {
+        $match: {
+          account: new mongoose.Types.ObjectId(accountId),
+          date: { $gte: startDate, $lte: now },
+        },
+      },
+      {
+        $group: {
+          _id: "$type",
+          totalAmount: { $sum: "$amount" },
+        },
+      },
+    ]);
+
+    let totalIncome = 0;
+    let totalExpenses = 0;
+
+    result.forEach((item) => {
+      if (item._id === "INCOME") totalIncome = item.totalAmount;
+      if (item._id === "EXPENSE") totalExpenses = item.totalAmount;
+    });
+
+    res.status(200).json({
+      message: `Summary for ${range}`,
+      totalIncome,
+      totalExpenses,
+    });
+  } catch (error) {
+    console.error("Error in getAccountSummary:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 
 
 module.exports = {
@@ -265,5 +325,6 @@ module.exports = {
   editTransaction,
   deleteTransaction,
   getAllTransactionsOfAccountPaginated,
+  getAccountSummary
 };
 
