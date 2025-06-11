@@ -1,6 +1,7 @@
 const AccountType = require("../models/accountType");
 const {
   addAccountTypeValidationSchema,
+  updateAccountTypeValidationSchema,
 } = require("../validations/accountType");
 
 const addAccountType = async (req, res) => {
@@ -33,13 +34,13 @@ const addAccountType = async (req, res) => {
 const updateAccountType = async (req, res) => {
   try {
     const { id } = req.params;
-    let { name } = req.body;
-    name = name.trim();
-    if (!name) {
+    const result = updateAccountTypeValidationSchema.safeParse(req.body);
+    if (!result.success) {
       return res
         .status(400)
-        .json({ message: "Account type should not be empty" });
+        .json({ message: "Validation failed", error: result.error.format() });
     }
+    const name = result.data.name.trim();
 
     // Check if the account type name is already taken
     const existingType = await AccountType.findOne({ name });
