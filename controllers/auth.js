@@ -1,4 +1,4 @@
-const bcrypt = require("bcryptjs"); 
+const bcrypt = require("bcrypt");
 const User = require("../models/user");
 const { generateToken } = require("../helper/jwt");
 const {
@@ -9,11 +9,18 @@ const {
   AccessTokenCookieExpiry,
   RefreshTokenCookieExpiry,
 } = require("../constants/constant");
+const { registerSchema, loginSchema } = require("../validations/auth");
+const { formatError } = require("zod/v4");
 
 exports.signUp = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
-
+    const result = registerSchema.safeParse(req.body);
+    if (!result.success) {
+      return res
+        .status(400)
+        .json({ message: "Validation failed", error: result.error.format() });
+    }
+    const { email, name, password } = result.data;
     // Check if user already exists
     let user = await User.findOne({ email });
     if (user) {
@@ -33,6 +40,7 @@ exports.signUp = async (req, res) => {
       user: { id: user._id, name: user.name, email: user.email },
     });
   } catch (error) {
+    console.log(error);
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
@@ -41,7 +49,15 @@ exports.signUp = async (req, res) => {
 
 exports.signIn = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const result = loginSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({
+        message: "Validation failed",
+        errors: result.error.format(),
+      });
+    }
+
+    const { email, password } = result.data;
 
     // Check if user exists
     const user = await User.findOne({ email });
@@ -49,12 +65,11 @@ exports.signIn = async (req, res) => {
       return res.status(400).json({ message: "Invalid email or password" });
     }
 
-    // Compare password with hashed password using bcryptjs
+    // Compare passwords
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ message: "Invalid email or password" });
     }
-
     // Generate JWT tokens
     const accessToken = generateToken(
       { _id: user._id },
@@ -80,7 +95,8 @@ exports.signIn = async (req, res) => {
 
     res.status(200).json({
       message: "Login successful",
-      user: { id: user._id, name: user.name, email: user.email, accessToken },
+      user: { id: user._id, name: user.name, email: user.email },
+      accessToken,
     });
   } catch (error) {
     console.log(error);
@@ -90,9 +106,18 @@ exports.signIn = async (req, res) => {
   }
 };
 
-exports.logout = (req, res) => {
+exports.logout = async (req, res) => {
   try {
+    const refreshToken = req.cookies.refreshToken;
 
+    if (refreshToken) {
+      // Optional: Clear refresh token from DB
+      const user = await User.findOne({ refreshToken });
+      if (user) {
+        user.refreshToken = null;
+        await user.save();
+      }
+    }
     res.clearCookie("refreshToken", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
