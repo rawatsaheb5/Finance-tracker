@@ -44,7 +44,7 @@ const updateAccountType = async (req, res) => {
 
     // Check if the account type name is already taken
     const existingType = await AccountType.findOne({ name });
-    if (existingType && existingType._id !== id) {
+    if (existingType && existingType._id.toString() !== id) {
       return res.status(400).json({ message: "Account type already exists" });
     }
 
@@ -86,7 +86,7 @@ const deleteAccountType = async (req, res) => {
 
 const getAllAccountTypes = async (req, res) => {
   try {
-    const accountTypes = await AccountType.find();
+    const accountTypes = await AccountType.find().select("_id name");
     res.status(200).json({ accountTypes });
   } catch (error) {
     console.error(error);

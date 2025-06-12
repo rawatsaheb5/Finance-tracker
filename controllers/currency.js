@@ -1,9 +1,17 @@
 const Currency = require("../models/currency");
+const { updateAccountTypeValidationSchema } = require("../validations/accountType");
+const { addCurrencyValidationSchema } = require("../validations/currency");
 
 const addCurrency = async (req, res) => {
   try {
-    let { name } = req.body;
-    name = name.trim();
+    const result = addCurrencyValidationSchema.safeParse(req.body);
+    if (!result.success) {
+      res
+        .status(400)
+        .json({ message: "Validation failed", error: result.error.format() });
+    }
+    const name = result.data.name.trim();
+
     const currency = await Currency.findOne({ name });
     if (currency) {
       return res.status(400).json({ message: "Currency already exists" });
@@ -20,17 +28,22 @@ const addCurrency = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
 const editCurrency = async (req, res) => {
   try {
-    let { name } = req.body;
+    const result = updateAccountTypeValidationSchema.safeParse(req.body);
+    if (!result.success) {
+      res
+        .status(400)
+        .json({ message: "Validation failed", error: result.error.format() });
+    }
     const currencyId = req.params.currencyId;
-    name = name.trim();
+    const name = result.data.name.trim();
     const existingCurrency = await Currency.findOne({ name });
-    if (existingCurrency) {
+    if (existingCurrency && existingCurrency._id.toString() !== currencyId) {
       return res
         .status(400)
         .json({ message: "Currency with this name already exists" });
@@ -46,7 +59,7 @@ const editCurrency = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
@@ -63,13 +76,13 @@ const deleteCurrency = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
 const fetchAllCurrencies = async (req, res) => {
   try {
-    const currencies = await Currency.find();
+    const currencies = await Currency.find().select("_id name");
     return res.status(200).json({
       message: "All currencies fetched successfully",
       currency: currencies,
@@ -84,5 +97,5 @@ module.exports = {
   addCurrency,
   editCurrency,
   deleteCurrency,
-  fetchAllCurrencies
+  fetchAllCurrencies,
 };

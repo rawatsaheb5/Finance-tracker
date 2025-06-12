@@ -8,11 +8,7 @@ const currencySchema = new mongoose.Schema(
       required: true,
       unique: true,
       index: true,
-    },
-    symbol: {
-      type: String,
-      required: true,
-    },
+    }
   },
 
   { timestamps: true }
