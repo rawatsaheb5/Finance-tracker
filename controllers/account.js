@@ -190,60 +190,72 @@ const getAccountById = async (req, res) => {
 
 const getUserAccounts = async (req, res) => {
   try {
-    const userId = new mongoose.Types.ObjectId(req.user.id); // assuming auth middleware sets req.user
-
-    const result = await User.aggregate([
-      { $match: { _id: userId } },
+    const userId = req.user.userId;
+    const accounts = await User.aggregate([
+      {
+        $match: {
+          _id: new mongoose.Types.ObjectId(userId),
+        },
+      },
+      {
+        $unwind: {
+          path: "$accounts",
+        },
+      },
       {
         $lookup: {
           from: "accounts",
           localField: "accounts",
           foreignField: "_id",
-          as: "accountDetails",
+          as: "accountDetail",
         },
       },
-      { $unwind: "$accountDetails" },
+      {
+        $unwind: {
+          path: "$accountDetail",
+        },
+      },
+      {
+        $lookup: {
+          from: "accounttypes",
+          localField: "accountDetail.type",
+          foreignField: "_id",
+          as: "accountType",
+        },
+      },
+      {
+        $unwind: {
+          path: "$accountType",
+        },
+      },
       {
         $lookup: {
           from: "currencies",
-          localField: "accountDetails.currencyId",
+          localField: "accountDetail.currencyId",
           foreignField: "_id",
-          as: "currencyDetails",
-        },
-      },
-      { $unwind: "$currencyDetails" },
-      {
-        $project: {
-          _id: 0,
-          account: {
-            _id: "$accountDetails._id",
-            name: "$accountDetails.name",
-            balance: "$accountDetails.balance",
-            currency: {
-              _id: "$currencyDetails._id",
-              name: "$currencyDetails.name",
-              symbol: "$currencyDetails.symbol",
-            },
-          },
+          as: "currency",
         },
       },
       {
-        $group: {
-          _id: null,
-          accounts: { $push: "$account" },
+        $unwind: {
+          path: "$currency",
+          preserveNullAndEmptyArrays: true,
         },
       },
       {
         $project: {
-          _id: 0,
-          accounts: 1,
+          _id: 1,
+          accountName: "$accountDetail.name",
+          balance: "$accountDetail.balance",
+          type: "$accountType.name",
+          currency: "$currency.name",
         },
       },
     ]);
 
     res.status(200).json({
       message: "Accounts fetched successfully",
-      accounts: result[0]?.accounts || [],
+      accounts: accounts || [],
     });
   } catch (error) {
     console.error("Aggregation error:", error);
