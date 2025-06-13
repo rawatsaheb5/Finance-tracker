@@ -4,9 +4,10 @@ const AccountType = require("../models/accountType");
 const Currency = require("../models/currency");
 const User = require("../models/user");
 const Transaction = require("../models/transaction");
-const { addAccountValidationSchema, updateAccountValidationSchema } = require("../validations/account");
-
-
+const {
+  addAccountValidationSchema,
+  updateAccountValidationSchema,
+} = require("../validations/account");
 
 // type is objectid
 const addAccount = async (req, res) => {
@@ -64,7 +65,6 @@ const addAccount = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
 
 const updateAccount = async (req, res) => {
   try {
@@ -133,11 +133,55 @@ const deleteAccount = async (req, res) => {
 const getAccountById = async (req, res) => {
   try {
     const { accountId } = req.params;
-    const account = await Account.findById(accountId).populate("type");
+    const account = await Account.aggregate([
+      {
+        $match: {
+          _id: new mongoose.Types.ObjectId(accountId),
+        },
+      },
+      {
+        $lookup: {
+          from: "accounttypes",
+          localField: "type",
+          foreignField: "_id",
+          as: "accountType",
+        },
+      },
+      {
+        $unwind: {
+          path: "$accountType",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $lookup: {
+          from: "currencies",
+          localField: "currencyId",
+          foreignField: "_id",
+          as: "currency",
+        },
+      },
+      {
+        $unwind: {
+          path: "$currency",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          accountType: "$accountType.name",
+          currency: "$currency.name",
+          name: 1,
+          balance: 1,
+        },
+      },
+    ]);
+
     if (!account) {
       return res.status(404).json({ message: "Account not found" });
     }
-    return res.status(200).json({ account });
+    return res.status(200).json({ account: account[0] });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
@@ -206,9 +250,6 @@ const getUserAccounts = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
-
-
-
 
 module.exports = {
   addAccount,
