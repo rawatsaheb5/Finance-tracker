@@ -4,35 +4,41 @@ const AccountType = require("../models/accountType");
 const Currency = require("../models/currency");
 const User = require("../models/user");
 const Transaction = require("../models/transaction");
+const { addAccountValidationSchema, updateAccountValidationSchema } = require("../validations/account");
+
+
 
 // type is objectid
 const addAccount = async (req, res) => {
   try {
     const userId = req.user.userId;
-    let { name, type, balance, currencyId } = req.body;
+    const validation = addAccountValidationSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        message: "Validation failed",
+        error: validation.error.format(),
+      });
+    }
+    let { name, type, balance, currencyId } = validation.data;
     name = name.trim();
     type = type.trim();
     currencyId = currencyId.trim();
-    if (!name || !type || !balance || !currencyId) {
-      return res.status(400).json({ message: "All fields are required" });
-    }
-    if (balance < 0) {
-      return res
-        .status(400)
-        .json({ message: "Balance should be greater than 0" });
-    }
 
-    // Validate account type
-    const accountType = await AccountType.findById(type);
+    // Step 2: Validate referenced entities
+    const [accountType, existingCurrency] = await Promise.all([
+      AccountType.findById(type),
+      Currency.findById(currencyId),
+    ]);
+
     if (!accountType) {
       return res.status(400).json({ message: "Invalid account type" });
     }
-    const existingCurrency = await Currency.findById(currencyId);
+
     if (!existingCurrency) {
-      return res.status(400).json({ message: "Invalid currency " });
+      return res.status(400).json({ message: "Invalid currency" });
     }
 
-    // Create new account
+    // Step 3: Create account
     const newAccount = new Account({
       name,
       type,
@@ -41,43 +47,43 @@ const addAccount = async (req, res) => {
     });
 
     await newAccount.save();
-    const user = await User.findById(userId);
-    user.accounts.push(newAccount._id);
-    await user.save();
 
-    return res
-      .status(201)
-      .json({ message: "Account created successfully", account: newAccount });
+    // Step 4: Link account to user
+    await User.findByIdAndUpdate(
+      userId,
+      { $push: { accounts: newAccount._id } },
+      { new: true }
+    );
+
+    return res.status(201).json({
+      message: "Account created successfully",
+      account: newAccount,
+    });
   } catch (error) {
-    console.error(error);
+    console.error("Error adding account:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
 
+
 const updateAccount = async (req, res) => {
   try {
     const { accountId } = req.params;
-    let { name, type, balance } = req.body;
-    name = name.trim();
-    type = type.trim();
 
-    if (!name || !type || !balance) {
-      return res.status(400).json({ message: "All fields are required" });
-    }
-    if (balance < 0) {
-      return res
-        .status(400)
-        .json({ message: "Balance should be greater than 0" });
+    const result = updateAccountValidationSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({
+        message: "Validation failed",
+        error: result.error.format(),
+      });
     }
 
-    // Validate account type
-
+    const { name, type, balance } = result.data;
     const accountType = await AccountType.findById(type);
     if (!accountType) {
       return res.status(400).json({ message: "Invalid account type" });
     }
 
-    // Find and update account
     const updatedAccount = await Account.findByIdAndUpdate(
       accountId,
       { name, type, balance },
@@ -93,7 +99,7 @@ const updateAccount = async (req, res) => {
       account: updatedAccount,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Update account error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -103,23 +109,23 @@ const deleteAccount = async (req, res) => {
     const { accountId } = req.params;
     const userId = req.user.userId;
 
-    // Find and delete account
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { $pull: { accounts: accountId } },
-      { new: true }
-    );
-
     const deletedAccount = await Account.findByIdAndDelete(accountId);
 
-    if (!deletedAccount || !updatedUser) {
+    if (!deletedAccount) {
       return res.status(404).json({ message: "Account not found" });
     }
-    await Transaction.deleteMany({ account: accountId });
-    // filter out accountId from user account
+    await Promise.all([
+      User.findByIdAndUpdate(
+        userId,
+        { $pull: { accounts: accountId } },
+        { new: true }
+      ),
+      Transaction.deleteMany({ account: accountId }),
+    ]);
+
     return res.status(200).json({ message: "Account deleted successfully" });
   } catch (error) {
-    console.error(error);
+    console.error("Delete account error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
