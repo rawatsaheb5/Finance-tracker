@@ -1,15 +1,22 @@
 const PaymentMethod = require("../models/paymentMethod");
+const {
+  addPaymentMethodValidationSchema,
+  updatePaymentMethodValidationSchema,
+} = require("../validations/paymentMethod");
 
 const addPaymentMethod = async (req, res) => {
   try {
-    let { name } = req.body;
-    name = name.trim();
+    const result = addPaymentMethodValidationSchema.safeParse(req.body);
 
-    if (!name) {
-      return res.status(400).json({ message: "All fields are required" });
+    if (!result.success) {
+      return res.status(400).json({
+        message: "Validation failed",
+        error: validation.error.format(),
+      });
     }
 
-    // Validate account type
+    let { name } = result.data;
+    name = name.toUpperCase();
     const paymentMethod = await PaymentMethod.findOne({ name });
     if (paymentMethod) {
       return res.status(400).json({ message: "Payment method already exists" });
@@ -35,16 +42,19 @@ const addPaymentMethod = async (req, res) => {
 const updatePaymentMethod = async (req, res) => {
   try {
     const { id } = req.params;
-    let { name } = req.body;
-    name = name.trim();
+    const result = updatePaymentMethodValidationSchema.safeParse(req.body);
 
-    if (!name) {
-      return res.status(400).json({ message: "All fields are required" });
+    if (!result.success) {
+      return res.status(400).json({
+        message: "Validation failed",
+        error: validation.error.format(),
+      });
     }
 
-    // Validate account type
+    let { name } = result.data;
+    name = name.toUpperCase();
     let paymentMethod = await PaymentMethod.findOne({ name });
-    if (paymentMethod && paymentMethod._id !== id) {
+    if (paymentMethod && paymentMethod._id.toString() !== id) {
       return res.status(400).json({ message: "Invalid Payment method" });
     }
 
@@ -84,7 +94,14 @@ const deletePaymentMethod = async (req, res) => {
 
 const getAllPaymentMethods = async (req, res) => {
   try {
-    const allPaymentMethods = await PaymentMethod.find();
+    const allPaymentMethods = await PaymentMethod.aggregate([
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+        },
+      },
+    ]);
     return res.status(200).json({
       meessage: "All payment methods fetched successfully",
       paymentMethod: allPaymentMethods,
