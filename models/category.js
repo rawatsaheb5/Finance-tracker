@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-
+//only admin is allowed to add category
 const CategorySchema = new mongoose.Schema(
   {
     name: { type: String, required: true, unique: true, index: true },

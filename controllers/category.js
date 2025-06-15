@@ -1,15 +1,20 @@
 const Category = require("../models/category");
 const SubCategory = require("../models/subCategory");
+const { addCategoryValidationSchema, updateCategoryValidationSchema } = require("../validations/category");
 
+
+// category can be added only by the backend admin
 const addCategory = async (req, res) => {
   try {
-    let { name, icon } = req.body;
-    name = name.trim();
-    icon = icon.trim();
-    if (!name || !icon) {
-      return res.status(400).json({ message: "All fields are required" });
+    const result = addCategoryValidationSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({
+        message: "Validation failed",
+        error: result.error.format(),
+      });
     }
-    // Check if category already exists
+    let { name, icon } = result.data;
+    name = name[0].toUpperCase() + name.substring(1).toLowerCase();
     const existingCategory = await Category.findOne({ name });
     if (existingCategory) {
       return res.status(400).json({ message: "Category already exists" });
@@ -27,43 +32,41 @@ const addCategory = async (req, res) => {
   }
 };
 
+
+// only allowed to edit name and icon
 const updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    let { name, icon, subCategories } = req.body;
-    name = name.trim();
-    icon = icon.trim();
-
-    if (!Array.isArray(subCategories)) {
-      return res.status(400).json({ message: "Subcategory should be array" });
+    const result = updateCategoryValidationSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({
+        message: "Validation failed",
+        error: result.error.format(),
+      });
     }
-    // Check if category name is unique
+
+    let { name, icon } = result.data;
+    name = name[0].toUpperCase() + name.substring(1).toLowerCase();
+
     const existingCategory = await Category.findOne({ name });
-    if (existingCategory && existingCategory.id !== id) {
+
+    if (existingCategory && existingCategory._id.toString() !== id) {
       return res.status(400).json({ message: "Category name already exists" });
     }
-    
-    const validSubCategories = await Promise.all(
-      subCategories.map(async (subCategoryId) => {
-        const subCategory = await SubCategory.findById(subCategoryId);
-        return subCategory ? subCategoryId : null;
-      })
-    );
 
-    const filteredSubCategories = validSubCategories.filter(Boolean);
-
-    const updatedCategory = await Category.findByIdAndUpdate(
+    const category = await Category.findByIdAndUpdate(
       id,
-      { name, icon, subCategories: filteredSubCategories },
+      { name, icon },
       { new: true }
     );
 
-    if (!updatedCategory) {
-      return res.status(404).json({ message: "Category not found" });
+    if (!category) {
+      return res.status(400).json({ message: "Failed to update category" });
     }
+
     res.status(200).json({
       message: "Category updated successfully",
-      category: updatedCategory,
+      category, 
     });
   } catch (error) {
     console.error(error);
@@ -71,6 +74,7 @@ const updateCategory = async (req, res) => {
   }
 };
 
+// deleting any category will result into delete all its subcategories
 const deleteCategory = async (req, res) => {
   try {
     const { id } = req.params;
@@ -78,9 +82,19 @@ const deleteCategory = async (req, res) => {
     if (!deletedCategory) {
       return res.status(404).json({ message: "Category not found" });
     }
-    res.status(200).json({ message: "Category deleted successfully" });
+
+    // If subcategories exist, delete them
+    if (deletedCategory.subCategories?.length > 0) {
+      await SubCategory.deleteMany({
+        _id: { $in: deletedCategory.subCategories },
+      });
+    }
+
+    res.status(200).json({
+      message: "Category and its subcategories deleted successfully",
+    });
   } catch (error) {
-    console.error(error);
+    console.error("Error deleting category:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -95,106 +109,10 @@ const getAllCategories = async (req, res) => {
   }
 };
 
-const getCategoryWiseSummary = async (req, res) => {
-  try {
-    const { accountId } = req.params;
-    const { range } = req.query;
-
-    const now = new Date();
-    let startDate;
-
-    switch (range) {
-      case "weekly":
-        startDate = new Date(now);
-        startDate.setDate(now.getDate() - 7);
-        break;
-      case "monthly":
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        break;
-      case "yearly":
-        startDate = new Date(now.getFullYear(), 0, 1);
-        break;
-      default:
-        startDate = new Date("1970-01-01"); // if no range, include all data
-    }
-
-    const summary = await Transaction.aggregate([
-      {
-        $match: {
-          account: new mongoose.Types.ObjectId(accountId),
-          date: { $gte: startDate, $lte: now },
-        },
-      },
-      {
-        $group: {
-          _id: { category: "$category", type: "$type" },
-          totalAmount: { $sum: "$amount" },
-        },
-      },
-      {
-        $lookup: {
-          from: "categories",
-          localField: "_id.category",
-          foreignField: "_id",
-          as: "categoryDetails",
-        },
-      },
-      {
-        $unwind: "$categoryDetails",
-      },
-      {
-        $project: {
-          type: "$_id.type",
-          categoryId: "$_id.category",
-          categoryName: "$categoryDetails.name",
-          icon: "$categoryDetails.icon",
-          totalAmount: 1,
-          _id: 0,
-        },
-      },
-      {
-        $group: {
-          _id: "$categoryName",
-          icon: { $first: "$icon" },
-          income: {
-            $sum: {
-              $cond: [{ $eq: ["$type", "INCOME"] }, "$totalAmount", 0],
-            },
-          },
-          expense: {
-            $sum: {
-              $cond: [{ $eq: ["$type", "EXPENSE"] }, "$totalAmount", 0],
-            },
-          },
-        },
-      },
-      {
-        $project: {
-          category: "$_id",
-          icon: 1,
-          income: 1,
-          expense: 1,
-          _id: 0,
-        },
-      },
-    ]);
-
-    res.status(200).json({
-      message: `Category-wise summary for ${range || "all time"}`,
-      summary,
-    });
-  } catch (error) {
-    console.error("Error in getCategoryWiseSummary:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-};
-
 
 module.exports = {
   addCategory,
   updateCategory,
   deleteCategory,
   getAllCategories,
-  getCategoryWiseSummary,
- 
 };
