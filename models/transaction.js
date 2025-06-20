@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { string } = require("zod/v4");
 const TransactionSchema = new mongoose.Schema(
   {
     amount: { type: Number, required: true, min: 0 },
@@ -7,30 +8,26 @@ const TransactionSchema = new mongoose.Schema(
       ref: "Account",
       required: true,
       index: true,
-    }, 
+    },
     type: {
       type: String,
       enum: ["INCOME", "EXPENSE"],
       required: true,
       index: true,
-    }, // Credit/Debit
+    }, 
     category: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Category",
-      required: true,
-      index: true,
-    }, // Reference to Category
-    subCategory: { type: mongoose.Schema.Types.ObjectId, ref: "SubCategory" }, // Reference to SubCategory
+      type: String,
+    }, 
+    subCategory: {
+      type: String,
+    },
     paymentMethod: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "PaymentMethod",
-      required: true,
-      index: true,
-    }, // No strict enum for flexibility
-    notes: { type: String, maxlength: 500 }, // Additional details
-    tags: [{ type: String }], // To filter transactions
-    payer: { type: String, required: true }, // Person who paid
-    payee: { type: String, required: true }, // Person who received
+      type: String,
+    },
+    notes: { type: String, maxlength: 500 },
+    tags: [{ type: String }],
+    payer: { type: String, required: true },
+    payee: { type: String, required: true },
     date: {
       type: Date,
     },
