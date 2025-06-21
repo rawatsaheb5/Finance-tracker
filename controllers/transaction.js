@@ -1,3 +1,4 @@
+const mongoose = require("mongoose")
 // Controller to add a new transaction
 // amount => number , positive
 // currency => from user's account
@@ -18,8 +19,8 @@ const addTransaction = async (req, res) => {
       amount,
       accountId,
       type,
-      categoryId,
-      subCategoryId,
+      category,
+      subCategory,
       paymentMethod,
       notes,
       tags,
@@ -32,12 +33,13 @@ const addTransaction = async (req, res) => {
     if (
       !amount ||
       !accountId ||
-      !categoryId ||
-      !subCategoryId ||
+      !category ||
+      !subCategory ||
       !type ||
       !paymentMethod ||
       !payer ||
-      !payee
+      !payee ||
+      !date
     ) {
       return res
         .status(400)
@@ -58,28 +60,14 @@ const addTransaction = async (req, res) => {
 
     // Fetch required data in parallel
     try {
-      const [userBankAccount, category, subCategory] = await Promise.all([
-        Account.findById(accountId),
-        Category.findById(categoryId),
-        SubCategory.findById(subCategoryId),
+      const [userBankAccount] = await Promise.all([
+        Account.findById(accountId)
       ]);
 
       if (!userBankAccount) {
         return res.status(400).json({ message: "Invalid Account ID" });
       }
-      if (!category) {
-        return res.status(400).json({ message: "Invalid Category ID" });
-      }
-      if (!subCategory) {
-        return res.status(400).json({ message: "Invalid SubCategory ID" });
-      }
-      if (!category.subCategories.includes(subCategory._id)) {
-        return res
-          .status(400)
-          .json({
-            message: "SubCategory does not belong to the specified Category",
-          });
-      }
+      
 
       // Convert date to UTC if provided, otherwise default to current UTC time
       const transactionDate = date
@@ -89,11 +77,10 @@ const addTransaction = async (req, res) => {
       // Create and save the transaction
       const newTransaction = new Transaction({
         amount,
-        currency: userBankAccount.currency,
         account: userBankAccount._id,
         type,
-        category: category._id,
-        subCategory: subCategory._id,
+        category: category,
+        subCategory: subCategory,
         paymentMethod,
         notes,
         tags,
@@ -130,8 +117,8 @@ const editTransaction = async (req, res) => {
       amount,
       accountId,
       type,
-      categoryId,
-      subCategoryId,
+      category,
+      subCategory,
       paymentMethod,
       notes,
       tags,
@@ -146,22 +133,29 @@ const editTransaction = async (req, res) => {
       return res.status(404).json({ message: "Transaction not found" });
     }
 
-    // Validate account, category, and subcategory if changed
-    let userBankAccount, category, subCategory;
-    if (accountId || categoryId || subCategoryId) {
-      try {
-        [userBankAccount, category, subCategory] = await Promise.all([
-          accountId ? Account.findById(accountId) : Promise.resolve(null),
-          categoryId ? Category.findById(categoryId) : Promise.resolve(null),
-          subCategoryId ? SubCategory.findById(subCategoryId) : Promise.resolve(null),
-        ]);
+    // Validate transaction type
+    if (type && !["INCOME", "EXPENSE"].includes(type)) {
+      return res.status(400).json({ message: "Invalid transaction type" });
+    }
 
-        if (category && subCategory && !category.subCategories.includes(subCategory._id)) {
-          return res.status(400).json({ message: "SubCategory does not belong to the specified Category" });
+    // Validate amount
+    if (amount !== undefined && amount < 0) {
+      return res
+        .status(400)
+        .json({ message: "Amount should be a positive number" });
+    }
+
+    // Validate account if provided
+    let userBankAccount = null;
+    if (accountId) {
+      try {
+        userBankAccount = await Account.findById(accountId);
+        if (!userBankAccount) {
+          return res.status(400).json({ message: "Invalid Account ID" });
         }
       } catch (error) {
         return res.status(400).json({
-          message: "Error validating Account, Category, or SubCategory",
+          message: "Error validating account",
           error: error.message,
         });
       }
@@ -170,10 +164,10 @@ const editTransaction = async (req, res) => {
     // Prepare update object
     const updatedTransaction = {
       ...(amount !== undefined && { amount }),
-      ...(userBankAccount && { account: userBankAccount._id, currency: userBankAccount.currency }),
+      ...(userBankAccount && { account: userBankAccount._id }),
       ...(type && { type }),
-      ...(category && { category: category._id }),
-      ...(subCategory && { subCategory: subCategory._id }),
+      ...(category && { category }),
+      ...(subCategory && { subCategory }),
       ...(paymentMethod && { paymentMethod }),
       ...(notes && { notes }),
       ...(tags && { tags }),
@@ -182,8 +176,11 @@ const editTransaction = async (req, res) => {
       ...(date && { date: convertToUTC(date) }),
     };
 
-    // Update transaction
-    const updatedRecord = await Transaction.findByIdAndUpdate(transactionId, updatedTransaction, { new: true });
+    const updatedRecord = await Transaction.findByIdAndUpdate(
+      transactionId,
+      updatedTransaction,
+      { new: true }
+    );
 
     return res.status(200).json({
       message: "Transaction updated successfully",
@@ -353,6 +350,7 @@ const getBalanceTrend = async (req, res) => {
       {
         $project: {
           amount: {
+            // this will ensure that income is positive and expenses are negative
             $cond: [
               { $eq: ["$type", "INCOME"] },
               "$amount",
@@ -360,6 +358,7 @@ const getBalanceTrend = async (req, res) => {
             ],
           },
           dateGroup: {
+            //Converts the date field to a string using a specified format
             $dateToString: { format: dateFormat, date: "$date" },
           },
         },
