@@ -1,5 +1,7 @@
 const SubCategory = require("../models/subCategory");
 
+
+// subcategory can be added under category
 const addSubCategory = async (req, res) => {
   try {
     let { name, icon } = req.body;
